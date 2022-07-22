@@ -590,11 +590,9 @@ fn translate_log(stmt: Statement, state: &mut State, context: &Context) {
             line,
             message_id: state.message_id,
             print: code,
-            is_parallel: state.is_parallel
+            is_parallel: state.is_parallel,
+            label: label,
         }.allocate();
-        if let Some(label) = label {
-            state.log_labels.push(label);
-        }
         state.code.push(log);
     }
 }
