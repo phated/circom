@@ -90,6 +90,7 @@ struct State {
     component_address_stack: usize,
     is_parallel: bool,
     code: InstructionList,
+    log_labels: Vec<String>
 }
 
 impl State {
@@ -114,6 +115,7 @@ impl State {
             fresh_cmp_id: cmp_id_offset,
             max_stack_depth: 0,
             code: vec![],
+            log_labels: vec![],
         }
     }
     fn reserve(fresh: &mut usize, size: usize) -> usize {
@@ -581,7 +583,7 @@ fn translate_assert(stmt: Statement, state: &mut State, context: &Context) {
 
 fn translate_log(stmt: Statement, state: &mut State, context: &Context) {
     use Statement::LogCall;
-    if let LogCall { meta, arg, .. } = stmt {
+    if let LogCall { meta, arg, label, .. } = stmt {
         let line = context.files.get_line(meta.start, meta.get_file_id()).unwrap();
         let code = translate_expression(arg, state, context);
         let log = LogBucket {
@@ -590,6 +592,9 @@ fn translate_log(stmt: Statement, state: &mut State, context: &Context) {
             print: code,
             is_parallel: state.is_parallel
         }.allocate();
+        if let Some(label) = label {
+            state.log_labels.push(label);
+        }
         state.code.push(log);
     }
 }
@@ -1157,6 +1162,7 @@ pub struct CodeOutput {
     pub next_cmp_id: usize,
     pub code: InstructionList,
     pub constant_tracker: FieldTracker,
+    pub log_labels: Vec<String>,
 }
 
 pub fn translate_code(body: Statement, code_info: CodeInfo) -> CodeOutput {
@@ -1197,5 +1203,6 @@ pub fn translate_code(body: Statement, code_info: CodeInfo) -> CodeOutput {
         stack_depth: state.max_stack_depth,
         signal_depth: state.signal_stack,
         constant_tracker: state.field_tracker,
+        log_labels: state.log_labels,
     }
 }

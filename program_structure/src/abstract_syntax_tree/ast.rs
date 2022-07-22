@@ -186,6 +186,7 @@ pub enum Statement {
     LogCall {
         meta: Meta,
         arg: Expression,
+        label: Option<String>,
     },
     Block {
         meta: Meta,

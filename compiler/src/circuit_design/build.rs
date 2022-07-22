@@ -80,6 +80,9 @@ fn build_template_instances(
         };
         let code = template.code;
         let out = translate::translate_code(code, code_info);
+        for label in out.log_labels {
+            circuit.wasm_producer.message_list.push(label);
+        }
         field_tracker = out.constant_tracker;
         template_info.body = out.code;
         template_info.expression_stack_depth = out.expression_depth;
@@ -134,6 +137,9 @@ fn build_function_instances(
         };
         let code = instance.body;
         let out = translate::translate_code(code, code_info);
+        for label in out.log_labels {
+            circuit.wasm_producer.message_list.push(label);
+        }
         field_tracker = out.constant_tracker;
         function_info.body = out.code;
         function_info.max_number_of_ops_in_expression = out.expression_depth;
