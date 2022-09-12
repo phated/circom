@@ -2,6 +2,8 @@ const { execSync } = require('child_process')
 const path = require('path')
 const assert = require('assert')
 const fs = require('fs')
+const binFileUtils = require('@iden3/binfileutils')
+const r1csfile = require('r1csfile')
 
 function circom2(args) {
     const cmd = path.join('../', require('../package.json')['bin']['circom2'])
@@ -114,14 +116,70 @@ test('basic wasm', async () => {
         wtns.toString('hex').includes(expectedOutput),
         'could not find expected result in witness'
     )
+
+    const wtnsBin = await binFileUtils.readBinFile(
+        __dirname + '/out/basic_js/output.wtns',
+        'wtns',
+        2,
+        1 << 25,
+        1 << 23
+    )
+    const wtnsData = await readWtnsHeader(wtnsBin.fd, wtnsBin.sections)
+    assert(wtnsData.nWitness === 4)
+
+    const buffWitness = await binFileUtils.readSection(wtnsBin.fd, wtnsBin.sections, 2)
+
+    // console.log(buffWitness)
+    const witnessAt = (i) =>
+        fromRprLE(buffWitness.slice(i * wtnsData.n8, i * wtnsData.n8 + wtnsData.n8))
+
+    assert(witnessAt(1) === BigInt(input.a) * BigInt(input.b))
+
+    await wtnsBin.fd.close()
 })
 
-test('basic r1cs', () => {
+function fromRprLE(buff, o, n8) {
+    n8 = n8 || buff.byteLength
+    o = o || 0
+    const v = new Uint32Array(buff.buffer, o, n8 / 4)
+    const a = new Array(n8 / 4)
+    v.forEach((ch, i) => (a[a.length - i - 1] = ch.toString(16).padStart(8, '0')))
+
+    return BigInt('0x' + a.join(''))
+}
+
+async function readWtnsHeader(fd, sections) {
+    await binFileUtils.startReadUniqueSection(fd, sections, 1)
+    const n8 = await fd.readULE32()
+    const q = await binFileUtils.readBigInt(fd, n8)
+    const nWitness = await fd.readULE32()
+    await binFileUtils.endReadSection(fd)
+    return { n8, q, nWitness }
+}
+
+test('basic r1cs', async () => {
     const stdout = circom2('basic.circom --r1cs --output out')
     assert(stdout.includes('Everything went okay'), 'compilation failed')
     const r1cs = fs.readFileSync(__dirname + '/out/basic.r1cs').toString('hex')
     assert(r1cs.startsWith('7231637301'), 'r1cs magic number missing')
     assert(!r1cs.includes('030303030'), 'wasmer wasi r1cs generation bug found')
+
+    const result = await binFileUtils.readBinFile(
+        __dirname + '/out/basic.r1cs',
+        'r1cs',
+        1,
+        1 << 22,
+        1 << 24
+    )
+    const r1csdata = await r1csfile.readR1csHeader(
+        result.fd,
+        result.sections,
+        /* singleThread */ true
+    )
+    await result.fd.close()
+    assert(r1csdata.curve.name === 'bn128', 'wrong curve')
+    assert(r1csdata.nVars == 4)
+    assert(r1csdata.nOutputs == 1)
 })
 
 run()

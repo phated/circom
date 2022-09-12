@@ -6,6 +6,7 @@ This is only an experiment and has not been adequately tested!
 
 ## Changelog
 
+-   0.2.8 - Reverting upstream circom (8d6830a)
 -   0.2.7 - Pulling from upstream circom (c7971d7)
 -   0.2.6 - Pulling from upstream circom (2.0.8)
 -   0.2.5 - Syntax for adding labels to logs
