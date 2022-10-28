@@ -15,6 +15,12 @@ async function main() {
         preopens: preopensFull(),
         bindings: {
             ...bindings,
+            exit(code) {
+                process.exit(code)
+            },
+            kill(signal) {
+                process.kill(process.pid, signal)
+            },
             fs,
         },
     })
