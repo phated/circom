@@ -1,7 +1,7 @@
 const isTypedArray = require('is-typed-array')
 const path = require('path-browserify')
 
-const { WASI } = require('./vendor/wasi')
+const { WASI, WASIExitError, WASIKillError } = require('./vendor/wasi')
 
 const baseNow = Math.floor((Date.now() - performance.now()) * 1e-3)
 
@@ -41,19 +41,11 @@ function randomFillSync(buf, offset, size) {
 
 const defaultBindings = {
     hrtime: hrtime,
-    exit: (code) => {
-        if (typeof process !== 'undefined') {
-            process.exit(code)
-        } else {
-            throw new WASIExitError(code)
-        }
+    exit(code) {
+        throw new WASIExitError(code)
     },
-    kill: (signal) => {
-        if (typeof process !== 'undefined') {
-            process.kill(process.pid, signal)
-        } else {
-            throw new WASIKillError(signal)
-        }
+    kill(signal) {
+        throw new WASIKillError(signal)
     },
     randomFillSync: randomFillSync,
     isTTY: () => true,
@@ -106,7 +98,17 @@ class CircomRunner {
             ...this.wasi.getImports(mod),
         })
 
-        this.wasi.start(instance)
+        try {
+            this.wasi.start(instance)
+        } catch (err) {
+            // The circom devs decided to start forcing an exit call instead of exiting gracefully
+            // so we look for WASIExitError with success code so we can actually be graceful
+            if (err instanceof WASIExitError && err.code === 0) {
+                return instance
+            }
+
+            throw err
+        }
 
         // Return the instance in case someone wants to access exports or something
         return instance
